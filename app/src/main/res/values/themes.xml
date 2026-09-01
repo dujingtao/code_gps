@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Minimal activity theme: the actual UI is drawn entirely by Jetpack
+         Compose, so this only needs to control the system chrome (status
+         bar / no legacy action bar) before Compose content is set. -->
+    <style name="Theme.CodeGps" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@color/ic_launcher_background</item>
+    </style>
+</resources>

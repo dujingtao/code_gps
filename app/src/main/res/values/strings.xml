@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">code_gps</string>
+
+    <string name="permission_rationale_title">需要定位权限</string>
+    <string name="permission_rationale_body">code_gps 需要访问设备的位置信息，才能显示实时 GPS 坐标。</string>
+    <string name="permission_grant_button">授予权限</string>
+    <string name="permission_denied_message">定位权限被拒绝，无法获取 GPS 数据。请在系统设置中开启权限。</string>
+
+    <string name="location_waiting">正在等待 GPS 信号…</string>
+    <string name="label_latitude">纬度</string>
+    <string name="label_longitude">经度</string>
+    <string name="label_accuracy">精度 (米)</string>
+    <string name="label_altitude">海拔 (米)</string>
+    <string name="label_speed">速度 (米/秒)</string>
+    <string name="label_updated_at">最后更新</string>
+</resources>

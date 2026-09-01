@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#1B5E20</color>
+    <!-- Adaptive launcher icon backdrop — matches the HUD theme's dark navy. -->
+    <color name="ic_launcher_background">#0A0E1A</color>
+
+    <!-- Activity window background, shown briefly before Compose's first
+         frame renders; matches the HUD gradient's mid stop so there is no
+         light flash on cold start. -->
+    <color name="hud_window_background">#0A0E1A</color>
 </resources>

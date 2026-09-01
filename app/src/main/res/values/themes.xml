@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Minimal activity theme: the actual UI is drawn entirely by Jetpack
-         Compose, so this only needs to control the system chrome (status
-         bar / no legacy action bar) before Compose content is set. -->
-    <style name="Theme.CodeGps" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:statusBarColor">@color/ic_launcher_background</item>
+         Compose, so this only needs to set the window background (avoids a
+         white flash before Compose's first frame). Status/navigation bar
+         appearance is controlled at runtime via enableEdgeToEdge() in
+         MainActivity, not here. -->
+    <style name="Theme.CodeGps" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/hud_window_background</item>
     </style>
 </resources>

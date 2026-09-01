@@ -2,9 +2,12 @@ package com.codegps.app
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -15,6 +18,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.codegps.app.location.LocationRepository
 import com.codegps.app.ui.LocationPermissionStatus
 import com.codegps.app.ui.LocationScreen
+import com.codegps.app.ui.theme.CodeGpsTheme
 
 /**
  * App entry point. Hosts a single Compose screen that requests location
@@ -38,6 +42,15 @@ class MainActivity : ComponentActivity() {
     private var permissionStatus by mutableStateOf(LocationPermissionStatus.UNKNOWN)
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // The HUD theme is always dark, regardless of the system light/dark
+        // setting, so force light (i.e. white/cyan) status & navigation bar
+        // icons rather than letting enableEdgeToEdge() infer them from the
+        // system setting — on a light-system device that would otherwise
+        // pick dark icons that vanish against our dark background.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+        )
         super.onCreate(savedInstanceState)
 
         if (hasLocationPermission()) {
@@ -58,18 +71,20 @@ class MainActivity : ComponentActivity() {
                 remember { mutableStateOf(null) }
             }
 
-            LocationScreen(
-                permissionStatus = status,
-                reading = reading,
-                onRequestPermission = {
-                    requestPermissionLauncher.launch(
-                        arrayOf(
-                            Manifest.permission.ACCESS_FINE_LOCATION,
-                            Manifest.permission.ACCESS_COARSE_LOCATION,
+            CodeGpsTheme {
+                LocationScreen(
+                    permissionStatus = status,
+                    reading = reading,
+                    onRequestPermission = {
+                        requestPermissionLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION,
+                            )
                         )
-                    )
-                },
-            )
+                    },
+                )
+            }
         }
     }
 

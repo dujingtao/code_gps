@@ -7,7 +7,8 @@
     <string name="permission_grant_button">授予权限</string>
     <string name="permission_denied_message">定位权限被拒绝，无法获取 GPS 数据。请在系统设置中开启权限。</string>
 
-    <string name="location_waiting">正在等待 GPS 信号…</string>
+    <string name="status_searching">搜索卫星中…</string>
+    <string name="status_locked">已定位</string>
     <string name="label_latitude">纬度</string>
     <string name="label_longitude">经度</string>
     <string name="label_accuracy">精度 (米)</string>

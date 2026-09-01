@@ -15,7 +15,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.codegps.app.location.GnssRepository
 import com.codegps.app.location.LocationRepository
+import com.codegps.app.location.SatelliteInfo
 import com.codegps.app.ui.LocationPermissionStatus
 import com.codegps.app.ui.LocationScreen
 import com.codegps.app.ui.theme.CodeGpsTheme
@@ -27,6 +29,7 @@ import com.codegps.app.ui.theme.CodeGpsTheme
 class MainActivity : ComponentActivity() {
 
     private val locationRepository by lazy { LocationRepository(applicationContext) }
+    private val gnssRepository by lazy { GnssRepository(applicationContext) }
 
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
@@ -71,10 +74,20 @@ class MainActivity : ComponentActivity() {
                 remember { mutableStateOf(null) }
             }
 
+            // Same lifecycle-aware collection pattern as the location flow
+            // above: only subscribed to the GNSS status callback while the
+            // activity is at least STARTED and permission is granted.
+            val satellites by if (status == LocationPermissionStatus.GRANTED) {
+                gnssRepository.observeSatellites().collectAsStateWithLifecycle(initialValue = emptyList())
+            } else {
+                remember { mutableStateOf(emptyList<SatelliteInfo>()) }
+            }
+
             CodeGpsTheme {
                 LocationScreen(
                     permissionStatus = status,
                     reading = reading,
+                    satellites = satellites,
                     onRequestPermission = {
                         requestPermissionLauncher.launch(
                             arrayOf(

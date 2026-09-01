@@ -8,11 +8,22 @@
     <string name="permission_denied_message">定位权限被拒绝，无法获取 GPS 数据。请在系统设置中开启权限。</string>
 
     <string name="status_searching">搜索卫星中…</string>
+    <string name="status_searching_with_satellites">搜索卫星中…（可见 %1$d 颗）</string>
     <string name="status_locked">已定位</string>
+    <string name="status_locked_with_satellites">已定位 · %1$d/%2$d 颗卫星</string>
     <string name="label_latitude">纬度</string>
     <string name="label_longitude">经度</string>
     <string name="label_accuracy">精度 (米)</string>
     <string name="label_altitude">海拔 (米)</string>
     <string name="label_speed">速度 (米/秒)</string>
     <string name="label_updated_at">最后更新</string>
+
+    <string name="constellation_gps">GPS</string>
+    <string name="constellation_glonass">GLONASS</string>
+    <string name="constellation_beidou">北斗</string>
+    <string name="constellation_galileo">Galileo</string>
+    <string name="constellation_qzss">QZSS</string>
+    <string name="constellation_sbas">SBAS</string>
+    <string name="constellation_irnss">IRNSS</string>
+    <string name="constellation_unknown">未知</string>
 </resources>

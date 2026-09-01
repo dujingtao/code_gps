@@ -17,7 +17,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -31,14 +32,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.codegps.app.R
 import com.codegps.app.location.GpsReading
+import com.codegps.app.location.SatelliteInfo
 import com.codegps.app.ui.components.GlassSurface
-import com.codegps.app.ui.components.RadarIndicator
 import com.codegps.app.ui.components.ReadoutCard
+import com.codegps.app.ui.components.SatelliteSkyPlot
+import com.codegps.app.ui.components.SatelliteSummary
 import com.codegps.app.ui.components.SpeedGauge
 import com.codegps.app.ui.components.StatusChip
 import com.codegps.app.ui.theme.NeonCyan
 import com.codegps.app.ui.theme.NeonViolet
-import com.codegps.app.ui.theme.ReadoutLabelStyle
 import com.codegps.app.ui.theme.ReadoutValueStyle
 import com.codegps.app.ui.theme.SpaceBlackBottom
 import com.codegps.app.ui.theme.SpaceBlackMid
@@ -68,14 +70,16 @@ private val HudBackground = Brush.verticalGradient(
 
 /**
  * Root screen: a dark "HUD" style GPS readout. Shows a permission prompt
- * until location access is granted, then a radar-style position indicator
- * plus live instrument cards for altitude/accuracy/last-update and a speed
- * gauge, all continuously updated from [reading].
+ * until location access is granted, then a satellite sky plot with a
+ * per-constellation count summary, live position/altitude/accuracy cards,
+ * and a speed gauge — all continuously updated from [reading] and
+ * [satellites].
  */
 @Composable
 fun LocationScreen(
     permissionStatus: LocationPermissionStatus,
     reading: GpsReading?,
+    satellites: List<SatelliteInfo>,
     onRequestPermission: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -93,7 +97,7 @@ fun LocationScreen(
                 body = stringResource(R.string.permission_denied_message),
                 onRequestPermission = onRequestPermission,
             )
-            LocationPermissionStatus.GRANTED -> HudContent(reading = reading)
+            LocationPermissionStatus.GRANTED -> HudContent(reading = reading, satellites = satellites)
         }
     }
 }
@@ -133,36 +137,55 @@ private fun PermissionPrompt(body: String, onRequestPermission: () -> Unit) {
 }
 
 @Composable
-private fun HudContent(reading: GpsReading?) {
+private fun HudContent(reading: GpsReading?, satellites: List<SatelliteInfo>) {
     val isSearching = reading == null
-    val statusLabel = stringResource(
-        if (isSearching) R.string.status_searching else R.string.status_locked,
-    )
+    val usedCount = satellites.count { it.usedInFix }
+    val totalCount = satellites.size
+
+    // Fold the satellite count into the status label once GNSS data starts
+    // arriving; fall back to the plain label if no satellites are visible
+    // yet (e.g. right after permission is granted).
+    val statusLabel = when {
+        !isSearching && totalCount > 0 ->
+            stringResource(R.string.status_locked_with_satellites, usedCount, totalCount)
+        !isSearching -> stringResource(R.string.status_locked)
+        isSearching && totalCount > 0 -> stringResource(R.string.status_searching_with_satellites, totalCount)
+        else -> stringResource(R.string.status_searching)
+    }
     val statusColor = if (isSearching) NeonCyan else accuracyStatusColor(reading?.accuracyMeters)
 
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 28.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         StatusChip(label = statusLabel, color = statusColor, isPulsing = isSearching)
 
+        Spacer(modifier = Modifier.height(16.dp))
+
+        SatelliteSummary(satellites = satellites)
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        SatelliteSkyPlot(satellites = satellites)
+
         Spacer(modifier = Modifier.height(20.dp))
 
-        Box(contentAlignment = Alignment.Center) {
-            RadarIndicator(accuracyMeters = reading?.accuracyMeters, isSearching = isSearching)
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                CoordinateReadout(
-                    label = stringResource(R.string.label_latitude),
-                    value = reading?.let { "%.5f°".format(it.latitude) } ?: "--",
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                CoordinateReadout(
-                    label = stringResource(R.string.label_longitude),
-                    value = reading?.let { "%.5f°".format(it.longitude) } ?: "--",
-                )
-            }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            ReadoutCard(
+                accentColor = NeonCyan,
+                label = stringResource(R.string.label_latitude),
+                value = reading?.let { "%.5f°".format(it.latitude) } ?: "--",
+                modifier = Modifier.weight(1f),
+            )
+            ReadoutCard(
+                accentColor = NeonCyan,
+                label = stringResource(R.string.label_longitude),
+                value = reading?.let { "%.5f°".format(it.longitude) } ?: "--",
+                modifier = Modifier.weight(1f),
+            )
         }
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -201,20 +224,8 @@ private fun HudContent(reading: GpsReading?) {
             value = reading?.let { formatTimestamp(it.timestampMillis) } ?: "--",
             modifier = Modifier.fillMaxWidth(),
         )
-    }
-}
 
-/** A small muted [label] beside an animated coordinate [value] (lat or lon). */
-@Composable
-private fun CoordinateReadout(label: String, value: String) {
-    Row(verticalAlignment = Alignment.Bottom) {
-        Text(
-            text = label,
-            style = ReadoutLabelStyle,
-            color = TextSecondary,
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        AnimatedReadoutText(value)
+        Spacer(modifier = Modifier.height(12.dp))
     }
 }
 

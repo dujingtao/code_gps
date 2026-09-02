@@ -55,7 +55,15 @@ fun SatelliteSignalList(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        items(sorted, key = { "${it.constellation}-${it.svid}" }) { satellite ->
+        // No custom `key` here: a single physical satellite can appear as two
+        // separate GnssStatus entries with the *same* constellation+svid when
+        // a device tracks it on multiple frequency bands (e.g. L1+L5 dual-
+        // frequency GNSS, common on modern flagships) — a "constellation-svid"
+        // key would then collide and LazyColumn throws immediately. Falling
+        // back to the default position-based key avoids that; the only cost
+        // is losing per-row scroll-position identity across re-sorts, which
+        // doesn't matter for a read-only signal list.
+        items(sorted) { satellite ->
             SatelliteSignalRow(satellite)
         }
     }

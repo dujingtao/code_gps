@@ -2,7 +2,7 @@
 
 一款原生 Android（Kotlin）手机版 GPS 软件，目标是提供实时定位、轨迹记录等功能。当前处于早期开发阶段。
 
-## 当前功能（v0.4.0）
+## 当前功能（v0.4.1）
 
 - 请求并处理定位运行时权限（`ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION`），权限被拒绝时给出提示，不崩溃。
 - 通过 `FusedLocationProviderClient` 订阅实时位置更新。
@@ -84,6 +84,11 @@ sdk.dir=/path/to/your/Android/Sdk
 | `ACCESS_COARSE_LOCATION` | GPS 不可用时的网络定位兜底 |
 
 ## 版本历史
+
+### v0.4.1（2026-09-02）
+
+- 修复：真机上（尤其是支持双频 GNSS 的机型，如 Fold7）打开 App 会立刻闪退。原因是 `SatelliteSignalList` 的 `LazyColumn` 用"星座+卫星编号"拼出的字符串作为列表项 key；而支持 L1+L5 双频定位的手机会把同一颗卫星拆成两条 `GnssStatus` 记录（同一星座、同一编号，只是频段不同），导致 key 重复，Compose 直接抛异常崩溃。由于此前已经授权过定位权限，App 一启动就直接渲染真实卫星数据，正好触发这个重复 key，所以表现为"一打开就退出"。开发机没有真实卫星信号，之前完全测不出来。
+- 修复方式：`SatelliteSignalList` 不再使用自定义 key，改用列表默认的位置索引（保证唯一），代价是重排序时单行的滚动位置连续性略有损失，对一个只读的信号强度列表没有实际影响。
 
 ### v0.4.0（2026-09-02）
 

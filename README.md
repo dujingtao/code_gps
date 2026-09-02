@@ -2,7 +2,7 @@
 
 一款原生 Android（Kotlin）手机版 GPS 软件，目标是提供实时定位、轨迹记录等功能。当前处于早期开发阶段。
 
-## 当前功能（v0.4.1）
+## 当前功能（v0.5.0）
 
 - 请求并处理定位运行时权限（`ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION`），权限被拒绝时给出提示，不崩溃。
 - 通过 `FusedLocationProviderClient` 订阅实时位置更新。
@@ -13,8 +13,8 @@
 - 深色 HUD／卫星雷达风格界面（Jetpack Compose）：
   - 顶部状态胶囊：搜索卫星中 / 已定位（含卫星数）/ 权限被拒绝，搜索时状态点呈脉冲动画。
   - 经纬度、海拔、精度、最后更新时间以毛玻璃质感卡片展示（API 31+ 有真实背景模糊，以下版本自动降级为半透明纯色，不崩溃、不强制提高 `minSdk`）。
-  - 半圆形速度表（Canvas 绘制的渐变弧线，0–30 m/s）。
-  - 所有数值变化都有滑入/淡入动画，不会生硬跳变。
+  - 半圆形速度表（Canvas 绘制的渐变弧线，0–30 m/s），下方同时显示公里/小时与米/秒两种单位的速度读数。
+  - 所有实时数值（经纬度/速度/海拔/精度/最后更新时间）采用"里程表翻字"式动画：只有真正变化的字符位会翻动，未变化的字符保持不动，不再是整个数值一起上下跳动。
   - 自适应布局：屏幕宽度 < 600dp（手机、折叠屏合上时的外屏）用单列纵向滚动；≥ 600dp（平板、折叠屏展开后的内屏）切换为左右双栏布局，左栏是卫星几何信息（状态/分类统计/穹顶图），右栏是信号列表与各项数值卡片，两栏各自独立滚动，避免宽屏下内容偏窄、底部大片空白。
 
 ## 技术栈
@@ -36,7 +36,8 @@ app/src/main/kotlin/com/codegps/app/
 │   ├── LocationRepository.kt           # 封装 FusedLocationProviderClient，暴露 Flow<GpsReading>
 │   ├── GnssConstellation.kt            # 卫星系统枚举（GPS/GLONASS/北斗/Galileo…），与平台常量解耦
 │   ├── SatelliteInfo.kt                # 单颗卫星状态快照（方位角/仰角/信噪比/是否参与定位）
-│   └── GnssRepository.kt               # 封装 LocationManager.registerGnssStatusCallback，暴露 Flow<List<SatelliteInfo>>
+│   ├── GnssRepository.kt               # 封装 LocationManager.registerGnssStatusCallback，暴露 Flow<List<SatelliteInfo>>
+│   └── SpeedUnits.kt                    # m/s → km/h 换算（1 m/s = 3.6 km/h）
 └── ui/
     ├── LocationScreen.kt               # 组合根：权限提示 / HUD 主界面布局
     ├── theme/
@@ -47,12 +48,13 @@ app/src/main/kotlin/com/codegps/app/
     │   └── Theme.kt                     # CodeGpsTheme：固定深色 MaterialTheme
     └── components/
         ├── GlassSurface.kt              # 毛玻璃卡片容器（API 31+ 真实模糊，以下版本降级）
+        ├── OdometerText.kt              # 逐字符独立动画的"里程表"数值文本，按字符串末位对齐
         ├── SatelliteSkyPlot.kt          # 卫星穹顶图（极坐标 Canvas 绘制）+ 使用标记图例
         ├── SatelliteSummary.kt          # 按星座分组的卫星数量芯片列表
         ├── SatelliteSignalList.kt       # 按信号强度排序的卫星列表（信噪比条形图）
         ├── SignalStrength.kt            # 信噪比 → 0..1 归一化，穹顶图与信号列表共用同一套换算
         ├── SpeedGauge.kt                # 半圆速度表
-        ├── ReadoutCard.kt               # 单项数据卡片（色条 + 标签 + 动画数值）
+        ├── ReadoutCard.kt               # 单项数据卡片（色条 + 标签 + OdometerText 数值）
         └── StatusChip.kt                # 顶部状态胶囊（脉冲动画）
 ```
 
@@ -84,6 +86,12 @@ sdk.dir=/path/to/your/Android/Sdk
 | `ACCESS_COARSE_LOCATION` | GPS 不可用时的网络定位兜底 |
 
 ## 版本历史
+
+### v0.5.0（2026-09-02）
+
+- 速度同时显示公里/小时和米/秒两种单位（不是切换，而是并排常显），换算通过 `Float.metersPerSecondToKmh()`（1 m/s = 3.6 km/h）实现。
+- 新增 `OdometerText`：把数值动画从"整块滑动"改成"里程表翻字"效果——每个字符位独立动画，只有真正变化的字符会翻动，没变的字符保持静止。按**字符串末位对齐**（而不是从左数第几位）实现，因为经纬度、速度这类数值更新时长度会变化（如 "9.8" → "10.2"），从左边数索引的话新增的前导位会把后面所有字符的索引都顶偏一位，导致翻动的数字是错的；从右边数距离末尾几位来定位每个字符，才能保证每一位数字的身份跟真实的十进制位置对齐，这正是机械里程表的换字方式。
+- 经纬度、海拔、精度、最后更新时间（`ReadoutCard`）与速度（`SpeedSection`）统一改用 `OdometerText`，替换了之前两处各自实现的整块滑入动画（`LocationScreen.kt` 的 `AnimatedReadoutText` 已删除）。
 
 ### v0.4.1（2026-09-02）
 

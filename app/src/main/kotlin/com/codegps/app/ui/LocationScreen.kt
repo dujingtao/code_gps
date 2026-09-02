@@ -1,12 +1,5 @@
 package com.codegps.app.ui
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,7 +29,9 @@ import androidx.compose.ui.unit.dp
 import com.codegps.app.R
 import com.codegps.app.location.GpsReading
 import com.codegps.app.location.SatelliteInfo
+import com.codegps.app.location.metersPerSecondToKmh
 import com.codegps.app.ui.components.GlassSurface
+import com.codegps.app.ui.components.OdometerText
 import com.codegps.app.ui.components.ReadoutCard
 import com.codegps.app.ui.components.SatelliteSignalList
 import com.codegps.app.ui.components.SatelliteSkyPlot
@@ -46,7 +41,6 @@ import com.codegps.app.ui.components.SpeedGauge
 import com.codegps.app.ui.components.StatusChip
 import com.codegps.app.ui.theme.NeonCyan
 import com.codegps.app.ui.theme.NeonViolet
-import com.codegps.app.ui.theme.ReadoutValueStyle
 import com.codegps.app.ui.theme.SpaceBlackBottom
 import com.codegps.app.ui.theme.SpaceBlackMid
 import com.codegps.app.ui.theme.SpaceBlackTop
@@ -321,15 +315,37 @@ private fun LatLonCards(reading: GpsReading?) {
     }
 }
 
-/** Speed gauge + animated numeric readout — shared by both HUD layouts. */
+/**
+ * Speed gauge plus both live speed readouts — shared by both HUD layouts.
+ * km/h and m/s are shown side by side rather than one replacing the other,
+ * since which unit is more natural depends on the reader/activity (driving
+ * vs. walking) and neither should be hidden behind a toggle.
+ */
 @Composable
 private fun SpeedSection(reading: GpsReading?) {
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         SpeedGauge(speedMetersPerSecond = reading?.speedMetersPerSecond ?: 0f)
-        Spacer(modifier = Modifier.height(4.dp))
-        AnimatedReadoutText(reading?.let { "%.1f m/s".format(it.speedMetersPerSecond) } ?: "-- m/s")
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+            SpeedReadout(
+                value = reading?.let { "%.1f".format(it.speedMetersPerSecond.metersPerSecondToKmh()) } ?: "--",
+                unitLabel = stringResource(R.string.label_speed_kmh),
+            )
+            SpeedReadout(
+                value = reading?.let { "%.1f".format(it.speedMetersPerSecond) } ?: "--",
+                unitLabel = stringResource(R.string.label_speed_ms),
+            )
+        }
+    }
+}
+
+/** One unit's speed value (odometer-animated) with its unit label underneath. */
+@Composable
+private fun SpeedReadout(value: String, unitLabel: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        OdometerText(text = value)
         Text(
-            text = stringResource(R.string.label_speed),
+            text = unitLabel,
             style = MaterialTheme.typography.labelSmall,
             color = TextSecondary,
         )
@@ -364,25 +380,6 @@ private fun LastUpdatedCard(reading: GpsReading?) {
         value = reading?.let { formatTimestamp(it.timestampMillis) } ?: "--",
         modifier = Modifier.fillMaxWidth(),
     )
-}
-
-/**
- * Wraps [text] in a vertical slide/fade transition, keyed on the string
- * itself, so every readout animates like an odometer digit instead of
- * snapping when a new GPS update arrives.
- */
-@Composable
-private fun AnimatedReadoutText(text: String) {
-    AnimatedContent(
-        targetState = text,
-        transitionSpec = {
-            (slideInVertically(tween(220)) { it } + fadeIn(tween(220)))
-                .togetherWith(slideOutVertically(tween(220)) { -it } + fadeOut(tween(220)))
-        },
-        label = "readout_text",
-    ) { animated ->
-        Text(text = animated, style = ReadoutValueStyle, color = TextPrimary)
-    }
 }
 
 private fun formatTimestamp(epochMillis: Long): String =

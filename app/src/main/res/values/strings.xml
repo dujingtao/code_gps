@@ -15,7 +15,8 @@
     <string name="label_longitude">经度</string>
     <string name="label_accuracy">精度 (米)</string>
     <string name="label_altitude">海拔 (米)</string>
-    <string name="label_speed">速度 (米/秒)</string>
+    <string name="label_speed_kmh">公里/小时</string>
+    <string name="label_speed_ms">米/秒</string>
     <string name="label_updated_at">最后更新</string>
 
     <string name="constellation_gps">GPS</string>

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,6 +28,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -35,8 +38,10 @@ import com.codegps.app.location.GpsReading
 import com.codegps.app.location.SatelliteInfo
 import com.codegps.app.ui.components.GlassSurface
 import com.codegps.app.ui.components.ReadoutCard
+import com.codegps.app.ui.components.SatelliteSignalList
 import com.codegps.app.ui.components.SatelliteSkyPlot
 import com.codegps.app.ui.components.SatelliteSummary
+import com.codegps.app.ui.components.SatelliteUsedLegend
 import com.codegps.app.ui.components.SpeedGauge
 import com.codegps.app.ui.components.StatusChip
 import com.codegps.app.ui.theme.NeonCyan
@@ -69,11 +74,25 @@ private val HudBackground = Brush.verticalGradient(
 )
 
 /**
+ * Minimum window width, in dp, treated as "wide" (a tablet, or a foldable's
+ * unfolded inner display) rather than "compact" (a phone, or a foldable's
+ * cover screen). This is the same breakpoint Material's window-size-class
+ * uses for the compact→medium boundary; it's applied directly against
+ * [LocalConfiguration.screenWidthDp] here rather than pulling in the
+ * separate `material3-window-size-class` artifact, since the layout only
+ * needs this one width check.
+ */
+private const val WIDE_LAYOUT_MIN_WIDTH_DP = 600
+
+/**
  * Root screen: a dark "HUD" style GPS readout. Shows a permission prompt
  * until location access is granted, then a satellite sky plot with a
- * per-constellation count summary, live position/altitude/accuracy cards,
- * and a speed gauge — all continuously updated from [reading] and
- * [satellites].
+ * per-constellation count summary and signal-strength list, live
+ * position/altitude/accuracy cards, and a speed gauge — all continuously
+ * updated from [reading] and [satellites]. Below [WIDE_LAYOUT_MIN_WIDTH_DP]
+ * everything flows in one scrolling column; at or above it, the screen
+ * switches to a two-pane layout so a wide/unfolded display isn't left with a
+ * narrow column and empty space (see [CompactHudLayout] / [WideHudLayout]).
  */
 @Composable
 fun LocationScreen(
@@ -153,7 +172,40 @@ private fun HudContent(reading: GpsReading?, satellites: List<SatelliteInfo>) {
         else -> stringResource(R.string.status_searching)
     }
     val statusColor = if (isSearching) NeonCyan else accuracyStatusColor(reading?.accuracyMeters)
+    val isWideScreen = LocalConfiguration.current.screenWidthDp >= WIDE_LAYOUT_MIN_WIDTH_DP
 
+    if (isWideScreen) {
+        WideHudLayout(
+            reading = reading,
+            satellites = satellites,
+            statusLabel = statusLabel,
+            statusColor = statusColor,
+            isSearching = isSearching,
+        )
+    } else {
+        CompactHudLayout(
+            reading = reading,
+            satellites = satellites,
+            statusLabel = statusLabel,
+            statusColor = statusColor,
+            isSearching = isSearching,
+        )
+    }
+}
+
+/**
+ * Single scrolling column: everything stacked top to bottom. Used below
+ * [WIDE_LAYOUT_MIN_WIDTH_DP] (phones, and a foldable's folded/cover screen)
+ * where there isn't enough width for a useful side-by-side split.
+ */
+@Composable
+private fun CompactHudLayout(
+    reading: GpsReading?,
+    satellites: List<SatelliteInfo>,
+    statusLabel: String,
+    statusColor: Color,
+    isSearching: Boolean,
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -162,34 +214,117 @@ private fun HudContent(reading: GpsReading?, satellites: List<SatelliteInfo>) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         StatusChip(label = statusLabel, color = statusColor, isPulsing = isSearching)
-
         Spacer(modifier = Modifier.height(16.dp))
-
         SatelliteSummary(satellites = satellites)
-
         Spacer(modifier = Modifier.height(16.dp))
-
         SatelliteSkyPlot(satellites = satellites)
-
+        Spacer(modifier = Modifier.height(10.dp))
+        SatelliteUsedLegend()
+        Spacer(modifier = Modifier.height(16.dp))
+        SatelliteSignalList(
+            satellites = satellites,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(220.dp),
+        )
         Spacer(modifier = Modifier.height(20.dp))
+        LatLonCards(reading)
+        Spacer(modifier = Modifier.height(20.dp))
+        SpeedSection(reading)
+        Spacer(modifier = Modifier.height(20.dp))
+        AltitudeAccuracyCards(reading)
+        Spacer(modifier = Modifier.height(12.dp))
+        LastUpdatedCard(reading)
+        Spacer(modifier = Modifier.height(12.dp))
+    }
+}
 
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            ReadoutCard(
-                accentColor = NeonCyan,
-                label = stringResource(R.string.label_latitude),
-                value = reading?.let { "%.5f°".format(it.latitude) } ?: "--",
-                modifier = Modifier.weight(1f),
-            )
-            ReadoutCard(
-                accentColor = NeonCyan,
-                label = stringResource(R.string.label_longitude),
-                value = reading?.let { "%.5f°".format(it.longitude) } ?: "--",
-                modifier = Modifier.weight(1f),
-            )
+/**
+ * Two-pane layout used at or above [WIDE_LAYOUT_MIN_WIDTH_DP] (a tablet, or
+ * a foldable's unfolded inner display): the left pane holds satellite
+ * geometry (status, per-constellation summary, sky plot), the right pane
+ * holds the signal-strength list and every numeric readout. Each pane
+ * scrolls independently so the layout still works if either side overflows
+ * the available height, instead of the single narrow column v0.3.0 used —
+ * which left the bottom of a wide screen empty.
+ */
+@Composable
+private fun WideHudLayout(
+    reading: GpsReading?,
+    satellites: List<SatelliteInfo>,
+    statusLabel: String,
+    statusColor: Color,
+    isSearching: Boolean,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp, vertical = 28.dp),
+        horizontalArrangement = Arrangement.spacedBy(24.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            StatusChip(label = statusLabel, color = statusColor, isPulsing = isSearching)
+            Spacer(modifier = Modifier.height(16.dp))
+            SatelliteSummary(satellites = satellites)
+            Spacer(modifier = Modifier.height(20.dp))
+            SatelliteSkyPlot(satellites = satellites)
+            Spacer(modifier = Modifier.height(10.dp))
+            SatelliteUsedLegend()
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .verticalScroll(rememberScrollState()),
+        ) {
+            SatelliteSignalList(
+                satellites = satellites,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(280.dp),
+            )
+            Spacer(modifier = Modifier.height(20.dp))
+            LatLonCards(reading)
+            Spacer(modifier = Modifier.height(20.dp))
+            SpeedSection(reading)
+            Spacer(modifier = Modifier.height(20.dp))
+            AltitudeAccuracyCards(reading)
+            Spacer(modifier = Modifier.height(12.dp))
+            LastUpdatedCard(reading)
+        }
+    }
+}
 
+/** Latitude/longitude readout cards — shared by both HUD layouts. */
+@Composable
+private fun LatLonCards(reading: GpsReading?) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        ReadoutCard(
+            accentColor = NeonCyan,
+            label = stringResource(R.string.label_latitude),
+            value = reading?.let { "%.5f°".format(it.latitude) } ?: "--",
+            modifier = Modifier.weight(1f),
+        )
+        ReadoutCard(
+            accentColor = NeonCyan,
+            label = stringResource(R.string.label_longitude),
+            value = reading?.let { "%.5f°".format(it.longitude) } ?: "--",
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+/** Speed gauge + animated numeric readout — shared by both HUD layouts. */
+@Composable
+private fun SpeedSection(reading: GpsReading?) {
+    Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         SpeedGauge(speedMetersPerSecond = reading?.speedMetersPerSecond ?: 0f)
         Spacer(modifier = Modifier.height(4.dp))
         AnimatedReadoutText(reading?.let { "%.1f m/s".format(it.speedMetersPerSecond) } ?: "-- m/s")
@@ -198,35 +333,37 @@ private fun HudContent(reading: GpsReading?, satellites: List<SatelliteInfo>) {
             style = MaterialTheme.typography.labelSmall,
             color = TextSecondary,
         )
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            ReadoutCard(
-                accentColor = NeonViolet,
-                label = stringResource(R.string.label_altitude),
-                value = reading?.let { "%.1f m".format(it.altitudeMeters) } ?: "--",
-                modifier = Modifier.weight(1f),
-            )
-            ReadoutCard(
-                accentColor = accuracyStatusColor(reading?.accuracyMeters),
-                label = stringResource(R.string.label_accuracy),
-                value = reading?.let { "±%.1f m".format(it.accuracyMeters) } ?: "--",
-                modifier = Modifier.weight(1f),
-            )
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        ReadoutCard(
-            accentColor = TextSecondary,
-            label = stringResource(R.string.label_updated_at),
-            value = reading?.let { formatTimestamp(it.timestampMillis) } ?: "--",
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
     }
+}
+
+/** Altitude/accuracy readout cards — shared by both HUD layouts. */
+@Composable
+private fun AltitudeAccuracyCards(reading: GpsReading?) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        ReadoutCard(
+            accentColor = NeonViolet,
+            label = stringResource(R.string.label_altitude),
+            value = reading?.let { "%.1f m".format(it.altitudeMeters) } ?: "--",
+            modifier = Modifier.weight(1f),
+        )
+        ReadoutCard(
+            accentColor = accuracyStatusColor(reading?.accuracyMeters),
+            label = stringResource(R.string.label_accuracy),
+            value = reading?.let { "±%.1f m".format(it.accuracyMeters) } ?: "--",
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+/** Last-updated timestamp card — shared by both HUD layouts. */
+@Composable
+private fun LastUpdatedCard(reading: GpsReading?) {
+    ReadoutCard(
+        accentColor = TextSecondary,
+        label = stringResource(R.string.label_updated_at),
+        value = reading?.let { formatTimestamp(it.timestampMillis) } ?: "--",
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 /**

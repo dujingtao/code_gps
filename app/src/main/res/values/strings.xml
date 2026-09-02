@@ -26,4 +26,6 @@
     <string name="constellation_sbas">SBAS</string>
     <string name="constellation_irnss">IRNSS</string>
     <string name="constellation_unknown">未知</string>
+
+    <string name="satellite_used_legend">带光环标记的卫星已用于定位解算</string>
 </resources>

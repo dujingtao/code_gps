@@ -1,17 +1,26 @@
 package com.codegps.app.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.codegps.app.R
 import com.codegps.app.location.SatelliteInfo
+import com.codegps.app.ui.theme.NeonCyan
+import com.codegps.app.ui.theme.ReadoutLabelStyle
 import com.codegps.app.ui.theme.TextSecondary
 import com.codegps.app.ui.theme.color
 import kotlin.math.cos
@@ -21,14 +30,17 @@ import kotlin.math.sin
 /** Elevation angles (degrees above horizon) the sky plot draws reference rings at. */
 private val ELEVATION_RING_DEGREES = listOf(0f, 30f, 60f)
 
+/** Overall size of the sky-plot canvas. */
+private val SKY_PLOT_SIZE_DP = 248.dp
+
 /** Radius, in dp, of a satellite dot that is currently used in the position fix. */
-private const val USED_DOT_RADIUS_DP = 5f
+private const val USED_DOT_RADIUS_DP = 7f
 
 /** Radius, in dp, of a satellite dot that is visible but not used in the fix. */
-private const val UNUSED_DOT_RADIUS_DP = 4f
+private const val UNUSED_DOT_RADIUS_DP = 5.5f
 
-/** Typical strong-signal ceiling (dB-Hz), used only to normalize dot size/alpha — not a hard limit. */
-private const val MAX_EXPECTED_CN0_DB_HZ = 45f
+/** Gap, in dp, between a used-in-fix dot's edge and its "lock" halo ring. */
+private const val USED_HALO_GAP_DP = 3f
 
 /**
  * A polar "sky plot" / dome view of every visible GNSS satellite: each dot
@@ -39,10 +51,11 @@ private const val MAX_EXPECTED_CN0_DB_HZ = 45f
  * straight up shows compass azimuth (0°=N, 90°=E, ...).
  *
  * Dots are colored per constellation (see
- * [com.codegps.app.ui.theme.color]) and rendered solid when
- * [SatelliteInfo.usedInFix] is true, or as a smaller hollow ring when the
- * satellite is only visible but not used — the same "in use" vs
- * "in view only" distinction every GPS-test app shows.
+ * [com.codegps.app.ui.theme.color]). A satellite actually used in the
+ * position fix ([SatelliteInfo.usedInFix]) gets a solid dot plus a "lock"
+ * halo ring drawn around it — an unambiguous marker, not just a subtler
+ * fill — while a satellite that is only visible renders as a smaller hollow
+ * ring with no halo. [SatelliteUsedLegend] spells this out in text.
  */
 @Composable
 fun SatelliteSkyPlot(
@@ -52,7 +65,7 @@ fun SatelliteSkyPlot(
     val textMeasurer = rememberTextMeasurer()
     val labelStyle = TextStyle(color = TextSecondary, fontSize = 11.sp)
 
-    Canvas(modifier = modifier.size(220.dp)) {
+    Canvas(modifier = modifier.size(SKY_PLOT_SIZE_DP)) {
         val radius = min(size.width, size.height) / 2f
         val center = Offset(size.width / 2f, size.height / 2f)
 
@@ -90,14 +103,25 @@ fun SatelliteSkyPlot(
 
             // Stronger signal renders a touch bigger/brighter, but this is a
             // subtle modulation only — used/not-used + constellation color
-            // stay the primary signal, so alpha never drops low enough to
-            // make a weak-signal satellite effectively invisible.
-            val signalFraction = (satellite.cn0DbHz / MAX_EXPECTED_CN0_DB_HZ).coerceIn(0.3f, 1f)
+            // stay the primary signal, so the fraction never drops low
+            // enough to make a weak-signal satellite effectively invisible.
+            val signalFraction = satellite.cn0DbHz.toSignalFraction()
 
             if (satellite.usedInFix) {
+                val dotRadius = USED_DOT_RADIUS_DP.dp.toPx() * signalFraction
+
+                // "Lock" halo: the primary visual marker for "this satellite
+                // is factored into the position fix," independent of the
+                // solid-vs-hollow fill so it reads clearly even at a glance.
+                drawCircle(
+                    color = dotColor.copy(alpha = 0.9f),
+                    radius = dotRadius + USED_HALO_GAP_DP.dp.toPx(),
+                    center = dotCenter,
+                    style = Stroke(width = 1.5.dp.toPx()),
+                )
                 drawCircle(
                     color = dotColor.copy(alpha = 0.5f + 0.5f * signalFraction),
-                    radius = USED_DOT_RADIUS_DP.dp.toPx() * signalFraction,
+                    radius = dotRadius,
                     center = dotCenter,
                 )
             } else {
@@ -109,6 +133,34 @@ fun SatelliteSkyPlot(
                 )
             }
         }
+    }
+}
+
+/**
+ * Small caption explaining the "lock" halo ring [SatelliteSkyPlot] draws
+ * around used-in-fix satellites (and the matching checkmark badge in
+ * [SatelliteSignalList]) — both views share the same visual language, so one
+ * legend, drawn the same way as the halo itself, covers both.
+ */
+@Composable
+fun SatelliteUsedLegend(modifier: Modifier = Modifier) {
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        Canvas(modifier = Modifier.size(16.dp)) {
+            val center = Offset(size.width / 2f, size.height / 2f)
+            drawCircle(color = NeonCyan, radius = 3.dp.toPx(), center = center)
+            drawCircle(
+                color = NeonCyan.copy(alpha = 0.9f),
+                radius = 3.dp.toPx() + USED_HALO_GAP_DP.dp.toPx(),
+                center = center,
+                style = Stroke(width = 1.5.dp.toPx()),
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = stringResource(R.string.satellite_used_legend),
+            style = ReadoutLabelStyle,
+            color = TextSecondary,
+        )
     }
 }
 

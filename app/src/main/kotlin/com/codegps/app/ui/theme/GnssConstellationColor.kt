@@ -45,3 +45,20 @@ fun GnssConstellation.labelRes(): Int = when (this) {
     GnssConstellation.IRNSS -> R.string.constellation_irnss
     GnssConstellation.UNKNOWN -> R.string.constellation_unknown
 }
+
+/**
+ * Single-letter prefix conventionally used to tell satellites of different
+ * constellations apart in a compact list (e.g. "G12" for GPS PRN 12, "C06"
+ * for BeiDou) — shown ahead of the raw [com.codegps.app.location.SatelliteInfo.svid]
+ * in [SatelliteSignalList][com.codegps.app.ui.components.SatelliteSignalList].
+ */
+fun GnssConstellation.shortPrefix(): String = when (this) {
+    GnssConstellation.GPS -> "G"
+    GnssConstellation.GLONASS -> "R"
+    GnssConstellation.BEIDOU -> "C"
+    GnssConstellation.GALILEO -> "E"
+    GnssConstellation.QZSS -> "J"
+    GnssConstellation.SBAS -> "S"
+    GnssConstellation.IRNSS -> "I"
+    GnssConstellation.UNKNOWN -> "?"
+}

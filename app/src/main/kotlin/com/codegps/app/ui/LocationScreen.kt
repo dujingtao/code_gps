@@ -31,13 +31,11 @@ import com.codegps.app.location.GpsReading
 import com.codegps.app.location.SatelliteInfo
 import com.codegps.app.location.metersPerSecondToKmh
 import com.codegps.app.ui.components.GlassSurface
-import com.codegps.app.ui.components.OdometerText
 import com.codegps.app.ui.components.ReadoutCard
 import com.codegps.app.ui.components.SatelliteSignalList
 import com.codegps.app.ui.components.SatelliteSkyPlot
 import com.codegps.app.ui.components.SatelliteSummary
 import com.codegps.app.ui.components.SatelliteUsedLegend
-import com.codegps.app.ui.components.SpeedGauge
 import com.codegps.app.ui.components.StatusChip
 import com.codegps.app.ui.theme.NeonCyan
 import com.codegps.app.ui.theme.NeonViolet
@@ -81,8 +79,8 @@ private const val WIDE_LAYOUT_MIN_WIDTH_DP = 600
 /**
  * Root screen: a dark "HUD" style GPS readout. Shows a permission prompt
  * until location access is granted, then a satellite sky plot with a
- * per-constellation count summary and signal-strength list, live
- * position/altitude/accuracy cards, and a speed gauge — all continuously
+ * per-constellation count summary and signal-strength list, plus live
+ * position/speed/altitude/accuracy readout cards — all continuously
  * updated from [reading] and [satellites]. Below [WIDE_LAYOUT_MIN_WIDTH_DP]
  * the satellite geometry stays pinned at the top while everything else
  * scrolls beneath it; at or above it, the screen switches to a two-pane
@@ -335,38 +333,27 @@ private fun LatLonCards(reading: GpsReading?) {
 }
 
 /**
- * Speed gauge plus both live speed readouts — shared by both HUD layouts.
- * km/h and m/s are shown side by side rather than one replacing the other,
- * since which unit is more natural depends on the reader/activity (driving
- * vs. walking) and neither should be hidden behind a toggle.
+ * Speed readouts, km/h and m/s side by side — shared by both HUD layouts.
+ * Previously paired with a semi-circular gauge; the gauge is gone as of
+ * v0.5.2 — at typical walking/indoor-test speeds it sat almost empty and
+ * added visual weight without adding legibility, so speed now gets the same
+ * plain numeric-card treatment as every other readout instead of its own
+ * graphic.
  */
 @Composable
 private fun SpeedSection(reading: GpsReading?) {
-    Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        SpeedGauge(speedMetersPerSecond = reading?.speedMetersPerSecond ?: 0f)
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-            SpeedReadout(
-                value = reading?.let { "%.1f".format(it.speedMetersPerSecond.metersPerSecondToKmh()) } ?: "--",
-                unitLabel = stringResource(R.string.label_speed_kmh),
-            )
-            SpeedReadout(
-                value = reading?.let { "%.1f".format(it.speedMetersPerSecond) } ?: "--",
-                unitLabel = stringResource(R.string.label_speed_ms),
-            )
-        }
-    }
-}
-
-/** One unit's speed value (odometer-animated) with its unit label underneath. */
-@Composable
-private fun SpeedReadout(value: String, unitLabel: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        OdometerText(text = value)
-        Text(
-            text = unitLabel,
-            style = MaterialTheme.typography.labelSmall,
-            color = TextSecondary,
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        ReadoutCard(
+            accentColor = NeonCyan,
+            label = stringResource(R.string.label_speed_kmh),
+            value = reading?.let { "%.1f".format(it.speedMetersPerSecond.metersPerSecondToKmh()) } ?: "--",
+            modifier = Modifier.weight(1f),
+        )
+        ReadoutCard(
+            accentColor = NeonCyan,
+            label = stringResource(R.string.label_speed_ms),
+            value = reading?.let { "%.1f".format(it.speedMetersPerSecond) } ?: "--",
+            modifier = Modifier.weight(1f),
         )
     }
 }

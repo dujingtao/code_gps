@@ -4,8 +4,6 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Text
@@ -37,6 +35,13 @@ import com.codegps.app.ui.theme.TextPrimary
  * doesn't animate specially is a brand-new leading position appearing (the
  * string growing a character): that position has no prior on-screen state to
  * transition from, so it simply appears already showing its value.
+ *
+ * Each changed character crossfades **in place** (no vertical slide) — an
+ * earlier version slid characters up/down, but with several readouts (and,
+ * in the satellite signal list, several rows) all updating within the same
+ * second, many independently-timed slides on screen at once read as chaotic
+ * rather than legible. A plain fade keeps each digit anchored to its slot so
+ * only the "what changed" signal remains.
  */
 @Composable
 fun OdometerText(
@@ -58,8 +63,7 @@ fun OdometerText(
                 AnimatedContent(
                     targetState = char,
                     transitionSpec = {
-                        (slideInVertically(tween(220)) { it } + fadeIn(tween(220)))
-                            .togetherWith(slideOutVertically(tween(220)) { -it } + fadeOut(tween(220)))
+                        fadeIn(tween(180)).togetherWith(fadeOut(tween(180)))
                     },
                     label = "odometer_char_$indexFromEnd",
                 ) { animatedChar ->

@@ -84,9 +84,11 @@ private const val WIDE_LAYOUT_MIN_WIDTH_DP = 600
  * per-constellation count summary and signal-strength list, live
  * position/altitude/accuracy cards, and a speed gauge — all continuously
  * updated from [reading] and [satellites]. Below [WIDE_LAYOUT_MIN_WIDTH_DP]
- * everything flows in one scrolling column; at or above it, the screen
- * switches to a two-pane layout so a wide/unfolded display isn't left with a
- * narrow column and empty space (see [CompactHudLayout] / [WideHudLayout]).
+ * the satellite geometry stays pinned at the top while everything else
+ * scrolls beneath it; at or above it, the screen switches to a two-pane
+ * layout (geometry fixed on the left, everything else scrolling on the
+ * right) so a wide/unfolded display isn't left with a narrow column and
+ * empty space (see [CompactHudLayout] / [WideHudLayout]).
  */
 @Composable
 fun LocationScreen(
@@ -188,9 +190,14 @@ private fun HudContent(reading: GpsReading?, satellites: List<SatelliteInfo>) {
 }
 
 /**
- * Single scrolling column: everything stacked top to bottom. Used below
- * [WIDE_LAYOUT_MIN_WIDTH_DP] (phones, and a foldable's folded/cover screen)
- * where there isn't enough width for a useful side-by-side split.
+ * Fixed sky-plot header on top, everything else scrolling underneath. Used
+ * below [WIDE_LAYOUT_MIN_WIDTH_DP] (phones, and a foldable's folded/cover
+ * screen) where there isn't enough width for a useful side-by-side split.
+ *
+ * The satellite geometry (status/summary/sky plot/legend) doesn't scroll —
+ * it's the thing you glance at, not read line by line, so pinning it means
+ * it's always visible while flicking through the numeric readouts below,
+ * rather than scrolling out of view along with everything else.
  */
 @Composable
 private fun CompactHudLayout(
@@ -200,47 +207,59 @@ private fun CompactHudLayout(
     statusColor: Color,
     isSearching: Boolean,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 28.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        StatusChip(label = statusLabel, color = statusColor, isPulsing = isSearching)
-        Spacer(modifier = Modifier.height(16.dp))
-        SatelliteSummary(satellites = satellites)
-        Spacer(modifier = Modifier.height(16.dp))
-        SatelliteSkyPlot(satellites = satellites)
-        Spacer(modifier = Modifier.height(10.dp))
-        SatelliteUsedLegend()
-        Spacer(modifier = Modifier.height(16.dp))
-        SatelliteSignalList(
-            satellites = satellites,
+    Column(modifier = Modifier.fillMaxSize()) {
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(220.dp),
-        )
-        Spacer(modifier = Modifier.height(20.dp))
-        LatLonCards(reading)
-        Spacer(modifier = Modifier.height(20.dp))
-        SpeedSection(reading)
-        Spacer(modifier = Modifier.height(20.dp))
-        AltitudeAccuracyCards(reading)
-        Spacer(modifier = Modifier.height(12.dp))
-        LastUpdatedCard(reading)
-        Spacer(modifier = Modifier.height(12.dp))
+                .padding(top = 28.dp)
+                .padding(horizontal = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            StatusChip(label = statusLabel, color = statusColor, isPulsing = isSearching)
+            Spacer(modifier = Modifier.height(16.dp))
+            SatelliteSummary(satellites = satellites)
+            Spacer(modifier = Modifier.height(16.dp))
+            SatelliteSkyPlot(satellites = satellites)
+            Spacer(modifier = Modifier.height(10.dp))
+            SatelliteUsedLegend()
+        }
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            SatelliteSignalList(
+                satellites = satellites,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(220.dp),
+            )
+            Spacer(modifier = Modifier.height(20.dp))
+            LatLonCards(reading)
+            Spacer(modifier = Modifier.height(20.dp))
+            SpeedSection(reading)
+            Spacer(modifier = Modifier.height(20.dp))
+            AltitudeAccuracyCards(reading)
+            Spacer(modifier = Modifier.height(12.dp))
+            LastUpdatedCard(reading)
+            Spacer(modifier = Modifier.height(12.dp))
+        }
     }
 }
 
 /**
  * Two-pane layout used at or above [WIDE_LAYOUT_MIN_WIDTH_DP] (a tablet, or
  * a foldable's unfolded inner display): the left pane holds satellite
- * geometry (status, per-constellation summary, sky plot), the right pane
- * holds the signal-strength list and every numeric readout. Each pane
- * scrolls independently so the layout still works if either side overflows
- * the available height, instead of the single narrow column v0.3.0 used —
- * which left the bottom of a wide screen empty.
+ * geometry (status, per-constellation summary, sky plot) and — like
+ * [CompactHudLayout]'s header — doesn't scroll, since it's a glanceable
+ * picture rather than a list of values to read through. The right pane holds
+ * the signal-strength list and every numeric readout and scrolls on its own,
+ * instead of the single narrow column v0.3.0 used — which left the bottom of
+ * a wide screen empty.
  */
 @Composable
 private fun WideHudLayout(
@@ -259,9 +278,9 @@ private fun WideHudLayout(
         Column(
             modifier = Modifier
                 .weight(1f)
-                .fillMaxHeight()
-                .verticalScroll(rememberScrollState()),
+                .fillMaxHeight(),
             horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
         ) {
             StatusChip(label = statusLabel, color = statusColor, isPulsing = isSearching)
             Spacer(modifier = Modifier.height(16.dp))
